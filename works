@@ -1,1 +1,14 @@
-sdfsdf
+#This is the main class that contains links to other classes
+class MyApp < Wx::App
+  #On first initialize display the menu screen
+  def on_init()
+    sound = Wx::Sound.new("C:/Users/Aces/workspace/GUITest/Credits.wav",false)
+    sound.play 
+    DisplayFrame.new(self).show
+  end
+  #Create a game window
+  def newGame(mode)
+    GraphicsFrame.new(self,mode).show
+  end
+end
+MyApp.new.main_loop()
