@@ -2,7 +2,7 @@
 #Mark Henkel
 #Alex Kahan
 
-#Include the requires gem and libraries
+#Include the requires gem and libraries to run
 begin
   require 'rubygems' 
 rescue LoadError
