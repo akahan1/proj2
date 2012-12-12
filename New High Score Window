@@ -1,0 +1,39 @@
+class Input < Wx::Frame
+    def initialize(score)
+      #creates a new window to input the name of the person who just got the new high score
+      super(nil, -1, "HighScore",
+                  DEFAULT_POSITION, Size.new(300,160), DEFAULT_FRAME_STYLE)
+              panel = Panel.new(self, -1)
+              
+      #sets background color
+      set_background_colour(BLACK)      
+      
+      #tells the user they got a new high score and gives them a textbox to enter 
+      #their name and a submit button to submit their name and highscore
+      label = StaticText.new(panel, -1, "Congratulation you got a new HIGH SCORE \n Enter your name:", Point.new(5,25))
+      text = Wx::TextCtrl.new(panel,:size => [60,-1],:value =>"",:pos=> Wx::Point.new(115,40))
+      button1 = Button.new(panel,-1,"Submit",Wx::Point.new(115,80))
+      label.set_foreground_colour(Wx::YELLOW)
+      my_font = Wx::Font.new()
+      my_font.set_point_size(10)
+      label.set_font(my_font)   
+      
+      #writes new high score and name of user in text file
+      evt_button(button1.get_id){
+        file2 = File.new("C:/Users/Mark/workspace/HighScore.txt", "w")
+        file2.puts("#{text.get_value} #{score}")
+        file2.close()
+        
+        on_close_me
+      }
+      
+      #closes window
+      evt_close { |e|
+        e.skip
+      }
+  end
+    
+  def on_close_me
+    close(true)
+  end
+end
