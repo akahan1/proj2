@@ -1,0 +1,611 @@
+#Sothiara Em
+#Mark Henkel
+#Alex Kahan
+
+#Include the requires gem and libraries
+begin
+  require 'rubygems' 
+rescue LoadError
+end
+require 'wx'
+include Wx
+
+
+#This is the pong/paddle object 
+class PongObj
+  #Creating the getter and setter for the attributes of the pong/paddle class
+  attr_accessor :font, :w, :h, :x, :y, :x_axis, :y_axis, :txt, :rotation,:fixedX,:fixedY 
+  #initially setting the attributes to 0
+  def initialize()
+    @boundry = false
+    @font = nil
+    @w = 0
+    @h = 0
+    @x = 0
+    @y = 0
+    @x_axis = 0
+    @y_axis = 0
+    @txt = ""
+    @rotation = 0
+  end  
+  
+  #It is called by the paddle object to move it up and down
+  def manualMove(y, max_x, max_y)    
+    @y += y
+    #Make sure the paddle does not move off screen
+    if (@y <= 0)
+      @y = 0
+    elsif (@y+@h) >= max_y
+      @y = max_y - @h
+    end
+  end
+  
+  #This move method is constantly being call by the pong object to move it across
+  #the screen and also check for collision detection
+  def move(max_x,max_y,max_sp,paddle,paddle2,p1Score,p2Score,win)
+    #move it to the left and right
+    @x += @x_axis
+    @y += @y_axis
+    #Check if the ball moved pass the user paddle (paddle1)
+    if (@x < (paddle[:x]-1))
+      #increase player 2 score
+      score = Integer(p2Score.get_value()) + 1
+      p2Score.set_value(score.to_s())
+      #Change the direction of the ball to the other way and resets it position
+      @x_axis =  max_sp
+      @x = @fixedX
+      @y = @fixedY
+      #Wait 2 seconds before continuing
+      sleep(2)
+      #Check to see if game is over
+      if (score == 3)
+        win.endGame(2)
+      end
+
+    #Check if the ball moved pass the cpu paddle (paddle2)
+    elsif ((@x) >= 470)   
+      #Increase player 1 score  
+      score = Integer(p1Score.get_value()) + 1
+      p1Score.set_value(score.to_s())
+      #Change the direction of the ball and reset its position
+      @x_axis = ( max_sp) * -1
+      @x = @fixedX
+      @y = @fixedY
+      #wait for 2 seconds before continuing
+      sleep(2)
+      #Check to see if game is over
+      if (score == 3)
+        win.endGame(1)
+      end
+    end   
+    
+    #Check for the vertical collision
+    if @y <= 0
+      #Change the direction of the vertical movement if go pass the top wall
+      @y_axis =  max_sp
+      @y = 0
+    elsif (@y+@h) >= max_y
+      #Change the direction of the virtical movement if go pass the bottom wall
+      @y_axis = ( max_sp) * -1
+      @y = max_y - @h
+    end
+    
+    #Check the pong collision with the paddles
+    #Check for collision wiht the user paddle
+    if ((@x - (@w / 2)) <= paddle[:x])
+      #If the pong is within the y range of the paddle
+      if((paddle[:y]-2) <= @y && @y <= (paddle[:y] + paddle[:h] + 2))
+        #change the direction of the ball
+        @x_axis *= -1
+      end
+    #Check for collision with the CPU paddle
+    elsif ((@x + (@w)) >= paddle2[:x])
+      #If the pong is within the y range of the paddle
+      if ((paddle2[:y]-5) <= @y && @y <= (paddle2[:y] + paddle2[:h] + 5))
+        #Change the direction of the ball
+        @x_axis *= -1
+      end
+    end
+  end
+
+  #Handle ball movement if it is in the timetrial mode
+  def wallMove(max_x,max_y,max_sp,paddle,p1Score,win)
+    #move it in the x and y
+    @x += @x_axis
+    @y += @y_axis
+    #increasing the score of the user as the tine progresses
+    score = Float(p1Score.get_value()) + 1
+    p1Score.set_value(score.to_s())
+      
+    #if the ball went pass the paddle it meant that it have it the user wall
+    if (@x < (paddle[:x]-1))  
+      
+      #Opening a file to read and look for the current highscore
+      file = File.new("C:/Users/Mark/workspace/HighScore.txt", "r")
+      line = file.gets
+      #Split the array to get the username and the highscore
+      array = line.split(" ") 
+      #close the file
+      file.close
+      puts array[1]
+      
+      #if the newscore is greater than the current highscore
+      if (Float(array[1]) < score)
+        #open a new window to tell the user of the highscore and ask for their name
+        highscore = Input.new(score).show
+      end
+      #Stop the ball animation
+      win.TimeEnd()
+      
+    #if it hit the wall, change the direction to move toward the user
+    elsif ((@x) >= 470)  
+      @x_axis = ( max_sp) * -1
+    end
+    
+    #Check the collsion with the ceiling and floor
+    if @y <= 0
+      @y_axis =  max_sp
+      @y = 0
+    elsif (@y+@h) >= max_y
+
+      @y_axis = ( max_sp) * -1
+      @y = max_y - @h
+    end
+    
+    #Check the collision with the user's paddle
+    if ((@x - (@w / 2)) <= paddle[:x])
+      if((paddle[:y]-2) <= @y && @y <= (paddle[:y] + paddle[:h] + 2))
+        @x_axis *= -1
+      end
+    end
+  end
+
+  #method to draw the component to the Window
+  def draw(gdc)
+    #Set the property
+    gdc.set_font(font)
+    gdc.draw_text(txt,x,y,rotation)
+  end
+  
+  #Get the attributes of the object
+  def [](symbol)
+    self.__send__(symbol,*[])
+  end
+  #Comparing the value of object
+  def []=(symbol,val)
+    self.__send__((symbol.to_s + "=").to_sym,*[val])
+  end
+end
+
+#This class contains the Attributes and method to handle the window which contains all of the component
+class GraphicsWindow < Wx::Window
+  #accessor and getter to get the score board
+  attr_accessor :p2Score, :p1Score, :label
+  
+  #initialize the component take in the parent frame and the game mode (timetrial, or P1 vs CPU)
+  def initialize(parent,mode)
+    
+    #Attact the parameter to a variable
+    @frame = parent
+    @gameMode = mode
+    #Set the parent
+    super(parent)
+    #set the background to black
+    set_background_colour(Wx::BLACK)
+    #Set the font and style for the pong and the paddle
+    @font = Wx::Font.new(18,Wx::FONTFAMILY_TELETYPE,
+                        Wx::FONTSTYLE_NORMAL,Wx::FONTWEIGHT_NORMAL)
+    #Getting the background image
+    img_file = File.join( File.dirname(__FILE__), 'background.jpg')
+    image = Wx::Image.new(img_file)
+    @bitmap = image.to_bitmap
+    
+    #Paint the components onto the window
+    evt_paint :on_paint
+    
+    #set a time for every 1 millisecond to update and animate the window
+    @timer = Wx::Timer.new(self,-1)
+    @timer.start(1)
+    #Set the event handler to handle the closing of the window
+    evt_close { | e | 
+    e.skip}
+    #calling the animate function everytime the timeevent fire
+    evt_timer -1, :animate
+  end
+  
+  def endGame(playerWon)
+   # @frame.closeFrame()
+    @timer.stop
+    evt_paint(){
+      drawWinner(playerWon)
+    } 
+  end
+  
+  #Function to stop the time event
+  def TimeEnd
+    @timer.stop
+  end
+  
+  #Draw the winning banner
+  def drawWinner(playerWon)
+    
+    #Getting the size of the screen
+    rect = self.get_client_size
+    #Loading the player1 win banner and convert it into bitmap
+    img_file1 = File.join( File.dirname(__FILE__), 'p1win.jpg')
+    image1 = Wx::Image.new(img_file1)
+    player1 = image1.to_bitmap
+    
+    #Loading the player2 win banner and convert it into bintmap
+    img_file2 = File.join( File.dirname(__FILE__), 'p2win.jpg')
+    image2 = Wx::Image.new(img_file2)
+    player2 = image2.to_bitmap
+    #Using the dc component to draw the images on screen
+    paint do |dc|
+      #Display the image if player 1 won  
+      if (playerWon == 1)
+        dc.draw_bitmap(player1,140,100,false)
+        puts "This is playerwon #{playerWon}"
+      elsif
+        #Display the image if player 2 won
+        dc.draw_bitmap(player2,140,100,false)
+        puts "This is playerwon #{playerWon}"
+      end
+    end
+    
+  end
+  
+  #Creating the paddles and the pong
+  def create_resources(gdc)
+    # Creating the paddle and the pong
+    @pong = PongObj.new()
+    @paddle = PongObj.new();
+    
+    #if it is timetrial do not create the second paddle
+    if (@gameMode == 1)
+      @paddle2 = PongObj.new();
+      @paddle2[:font] = gdc.create_font(@font,Wx::BLUE); @paddle2[:txt] = "|\n|"
+    end
+    # Store our fonts, and strings into the classes
+    @pong[:font] = gdc.create_font(@font,Wx::WHITE); @pong[:txt] = "O"
+    @paddle[:font] = gdc.create_font(@font,Wx::RED); @paddle[:txt] = "|\n|"
+    # Create the GraphicsContext resources.  For some reason, unable to utilize
+    # GraphicsContext#create(wxWindow) to create these resources in initialize().
+  end
+  
+  #Getting the paddle and pong characters width and height
+  def get_extents(gdc)
+    # Since we need a GDC and the text to get the extents, we do this in a
+    # separate method, though we should be able to do it with create_resources()
+    width,height,*garbage = gdc.get_text_extent(@pong[:txt])
+    #Setting the character width and height
+    @pong[:w] = width.to_i; @pong[:h] = height.to_i
+    width,height,*garbage = gdc.get_text_extent(@paddle[:txt])
+    @paddle[:w] = width.to_i; @paddle[:h] = height.to_i * 2
+    
+    #set the parameter if the game is Player vs CPU
+    if (@gameMode == 1)
+      width,height,*garbage = gdc.get_text_extent(@paddle2[:txt])
+      @paddle2[:w] = width.to_i; @paddle2[:h] = height.to_i * 2
+    end
+  end
+  
+  #Set the initial positions of the components
+  def setup_positions()
+    # get the screen size
+    size = self.get_client_size()
+    #set the defualt variables for the postion of the ball
+    @pong[:fixedX] = @pong[:x] = size.width/2 
+    @pong[:fixedY] = @pong[:y] = size.height/2
+    direction = rand(2)
+    
+    #determine at start game whether the ball would go to the left or the right
+    if (direction == 0)
+      @pong[:x_axis] = -2
+    elsif
+      @pong[:x_axis] = 2
+    end
+    direction = rand(2)
+    
+    if (direction == 0)
+          @pong[:y_axis] = -2
+        elsif
+          @pong[:y_axis] = 2
+        end
+    
+    #set the paddles initial position
+    pos_y = (size.height / 2) - (@paddle[:h] / 2)
+    @paddle[:x] = 3
+    @paddle[:y] = pos_y
+    #If the player is playing the first mode
+    if (@gameMode == 1)
+      @paddle2[:x] = size.width - 15
+      puts "paddle2 #{@paddle2[:x]}"
+      @paddle2[:y] = pos_y
+      puts "This is size #{size}"      
+    end
+  end
+  
+  #This is call every 1 millisecon based on the timer event
+  #This method animate and change the position of the ball and the paddle
+  #Also it listen for the input from the keyboard
+  def animate
+    #get the screen size
+    rect = self.get_client_size()
+    
+    #Generate a random number to determine the speed of the computer each run
+    speedSeed = 1 + rand(3)
+    #if to see if the player is playing the first mode
+    if (@gameMode == 1)
+      #Check for collision detection
+      if (@pong[:y] != (@paddle2[:y] + @paddle[:h]))
+        #move the paddle towards the y position of the ball, so it will follow the location of the ball
+        if (@pong[:y] < @paddle2[:y])
+          @paddle2.manualMove(speedSeed *-1, rect.width, rect.height)
+        else
+          @paddle2.manualMove(speedSeed, rect.width, rect.height)
+        end
+      end
+    end
+    
+    #Determine which move method the ball will call, base on the gametype
+    if (@gameMode == 1)
+      @pong.move(rect.width,rect.height,2,@paddle,@paddle2,self.p1Score(),self.p2Score(),self) unless @pong.nil?
+    elsif
+      @pong.wallMove(rect.width,rect.height,2,@paddle,self.p1Score(),self)
+    end
+    
+    #Listening for the key press event
+    evt_key_down(){ |evt|
+      #if the key press is the up arrow key move the user paddle up
+      if (evt.get_key_code() == 315)
+        @paddle.manualMove(-5, rect.width, rect.height)
+      #else if it is the down arrow key, move the user paddle down
+      elsif (evt.get_key_code() == 317)
+        @paddle.manualMove(5, rect.width, rect.height)
+      end
+    }
+    #repaint the window
+    refresh()
+  end
+  
+  #This method initially paint the window when it is first loaded, it will put all of the components on the window
+  def on_paint
+    # Drawing the components
+    rect = self.get_client_size
+    #catching the paint even
+    paint do |dc|
+      #draw the bitmap background
+      dc.draw_bitmap(@bitmap,0,0,false)
+      #create a drawing tool component
+      gdc = Wx::GraphicsContext.create(dc)
+      #if the ball is null
+      unless !@pong.nil?
+        create_resources(gdc)
+      end
+      unless !(@pong[:w] == 0)
+        gdc.set_font(@pong[:font])
+        get_extents(gdc)
+        setup_positions()
+      end
+      #draw the ball and the paddle
+      @pong.draw(gdc)
+      @paddle.draw(gdc)
+  
+      #draw the second paddle if the mode is the first mode     
+      if (@gameMode == 1)
+        @paddle2.draw(gdc)
+      end
+    end
+  end
+end
+
+#This is the container class that is the parent of GraphicsWindow which have all of the game components
+class GraphicsFrame < Wx::Frame
+  #initializing the class with the calling main as a parameter and the mode
+  def initialize(menu,mode)
+    super(nil,:title=>"Pong",:size=>[500,300])
+    #Storing the parameter and the mode
+    @parentMenu = menu
+    @gameMode = mode
+    #Creating a window
+    @win = GraphicsWindow.new(self,@gameMode)
+    
+    #Initializing the status bar
+    create_status_bar(4)
+    #set the label at position 1
+    status_bar.set_status_text("Player 1 Score:", 0)
+    #set a text box to display the score and store it at position 1 of the status bar
+    @win.p1Score = Wx::TextCtrl.new(status_bar,:size => [60,-1],:value =>"0")
+    
+    #Player 2 labels and score
+    status_bar.set_status_text("Player 2 Score:", 2)
+    @win.p2Score = Wx::TextCtrl.new(status_bar,:size => [60,-1],:value =>"0")
+  
+    #disable the textbox
+    @win.p1Score.set_editable(false);
+    @win.p2Score.set_editable(false);
+    
+    #catch and forward the window size change
+    evt_size :on_size
+    #catch and handle the window closing event
+    evt_close { | e | 
+    on_close_window(e)}
+      
+  end
+
+  #When the window closes, properly close the frame
+  def on_close_window(event)
+        event.skip
+  end
+   
+  # place the score textbox in the status bar
+  def on_size
+    #place the score box in the status bar and resize it if the window changes size
+    rect = status_bar.field_rect(1)
+    @win.p1Score.move [ rect.x + 2, rect.y + 2]
+    @win.p1Score.size = [ rect.width - 4, rect.height - 4 ] 
+     
+    rect = status_bar.field_rect(3)
+    @win.p2Score.move [ rect.x + 2, rect.y + 2]
+    @win.p2Score.size = [ rect.width - 4, rect.height - 4 ]
+  end
+end
+
+class DisplayFrame <Wx::Frame
+  def initialize(parent)        
+    #creates a new window o=for the main menu
+    super(nil, -1, "Wx::Pong Main Menu", Wx::DEFAULT_POSITION, :size=>[500,500])
+    panel = Panel.new(self, -1)
+        
+    #sets the color of the main menu to black
+    set_background_colour(BLACK)
+    
+    #creates a button and labels it Exit, if clicked closes the window
+    exit = Button.new(panel, -1, "Exit", Point.new(200,305))
+    evt_button( exit.get_id ) { on_close_me }
+      
+    #writes text on the window and creates a button labeled P1 vs CPU, 
+    #if clicked starts a game against a computer player  
+    label3 = StaticText.new(panel, -1, "Select a game mode:", Point.new(180,180))
+    button1 = Button.new(panel, -1, "P1 vs CPU", Point.new(200,200))
+      
+    evt_button( button1.get_id ){ 
+      parent.newGame(1)
+      on_close_me
+    }
+    
+    #creates a button labeled Time Trail, 
+    #if clicked opens a new window and starts a time trail game
+    button2 = Button.new(panel, -1, "Time Trial", Point.new(200,235))
+      
+    evt_button( button2.get_id ){ 
+      parent.newGame(2)
+      on_close_me
+    }
+              
+    #creates a button help button that when clicked
+    #brings up a window telling the user about the game
+    button3 = Button.new(panel, -1, "Help", Point.new(200,270))
+    evt_button( button3.get_id ) { helpWindow = Help.new.show}
+    
+    #writes the main text for the main menu and sets its various font sizes and syles
+    label = StaticText.new(panel, -1, "EXTREME PONG", Point.new(50,25))
+    label2 = StaticText.new(panel, -1, "Extended Edition", Point.new(140,85))
+    label.set_foreground_colour(Wx::BLUE)
+    my_font = Wx::Font.new()
+    my_font.set_family(Wx::FONTFAMILY_MODERN)
+    my_font.set_style(Wx::FONTSTYLE_ITALIC)
+    my_font.set_weight(Wx::FONTWEIGHT_BOLD)
+    my_font.set_point_size(40)
+    label.set_font(my_font)
+    
+    label2.set_foreground_colour(Wx::BLUE)
+    my_font = Wx::Font.new()
+    my_font.set_point_size(20)
+    label2.set_font(my_font)
+    
+    label3.set_foreground_colour(Wx::BLUE)
+    my_font = Wx::Font.new()
+    my_font.set_point_size(10)
+    label3.set_font(my_font)
+    
+    #closes window
+    evt_close { | e | 
+      on_close_window(e) }
+    
+      #sets button text colors to red
+    button1.set_foreground_colour(Wx::RED)
+    button2.set_foreground_colour(Wx::RED)
+    button3.set_foreground_colour(Wx::RED)
+    exit.set_foreground_colour(Wx::RED)
+      
+  end
+  
+  def on_close_me
+      close(true)
+  end
+
+  def on_close_window(event)
+    event.skip
+  end
+
+end
+  
+class Help < Wx::Frame
+  def initialize
+    #creates a new window for the help menu
+  super(nil, -1, "Pong Help Menu", 
+                DEFAULT_POSITION, Size.new(500,200), DEFAULT_FRAME_STYLE)
+            panel = Panel.new(self, -1)
+            
+      #sets background color
+      set_background_colour(BLACK)      
+      
+      #retrieves high score from text file
+      file = File.new("C:/Users/Mark/workspace/HighScore.txt", "r")
+      line = file.gets
+      array = line.split(" ") 
+      file.close    
+      
+      #displays information about the game and the current high score in time trial
+      label = StaticText.new(panel, -1, "1 vs CPU : Play a game of ping pong to 3 points against a computer player. \n\nTime Trial: Try to keep the ball alive by continueing to block it with your paddle \n everytime it comes to you.\n See how long you can last!\n \nTime Trial highscore: #{array[0]} - #{array[1]}.", Point.new(5,25))
+          label.set_foreground_colour(Wx::YELLOW)
+          my_font = Wx::Font.new()
+          my_font.set_point_size(10)
+          label.set_font(my_font)     
+    end
+  end
+  
+class Input < Wx::Frame
+    def initialize(score)
+      #creates a new window to input the name of the person who just got the new high score
+      super(nil, -1, "HighScore",
+                  DEFAULT_POSITION, Size.new(300,160), DEFAULT_FRAME_STYLE)
+              panel = Panel.new(self, -1)
+              
+      #sets background color
+      set_background_colour(BLACK)      
+      
+      #tells the user they got a new high score and gives them a textbox to enter 
+      #their name and a submit button to submit their name and highscore
+      label = StaticText.new(panel, -1, "Congratulation you got a new HIGH SCORE \n Enter your name:", Point.new(5,25))
+      text = Wx::TextCtrl.new(panel,:size => [60,-1],:value =>"",:pos=> Wx::Point.new(115,40))
+      button1 = Button.new(panel,-1,"Submit",Wx::Point.new(115,80))
+      label.set_foreground_colour(Wx::YELLOW)
+      my_font = Wx::Font.new()
+      my_font.set_point_size(10)
+      label.set_font(my_font)   
+      
+      #writes new high score and name of user in text file
+      evt_button(button1.get_id){
+        file2 = File.new("C:/Users/Mark/workspace/HighScore.txt", "w")
+        file2.puts("#{text.get_value} #{score}")
+        file2.close()
+        
+        on_close_me
+      }
+      
+      #closes window
+      evt_close { |e|
+        e.skip
+      }
+  end
+    
+  def on_close_me
+    close(true)
+  end
+end
+
+#This is the main class that contains links to other classes
+class MyApp < Wx::App
+  #On first initialize display the menu screen
+  def on_init()
+    DisplayFrame.new(self).show
+  end
+  #Create a game window
+  def newGame(mode)
+    GraphicsFrame.new(self,mode).show
+  end
+end
+MyApp.new.main_loop()
