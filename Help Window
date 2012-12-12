@@ -1,0 +1,24 @@
+class Help < Wx::Frame
+  def initialize
+    #creates a new window for the help menu
+  super(nil, -1, "Pong Help Menu", 
+                DEFAULT_POSITION, Size.new(500,200), DEFAULT_FRAME_STYLE)
+            panel = Panel.new(self, -1)
+            
+      #sets background color
+      set_background_colour(BLACK)      
+      
+      #retrieves high score from text file
+      file = File.new("C:/Users/Mark/workspace/HighScore.txt", "r")
+      line = file.gets
+      array = line.split(" ") 
+      file.close    
+      
+      #displays information about the game and the current high score in time trial
+      label = StaticText.new(panel, -1, "1 vs CPU : Play a game of ping pong to 3 points against a computer player. \n\nTime Trial: Try to keep the ball alive by continueing to block it with your paddle \n everytime it comes to you.\n See how long you can last!\n \nTime Trial highscore: #{array[0]} - #{array[1]}.", Point.new(5,25))
+          label.set_foreground_colour(Wx::YELLOW)
+          my_font = Wx::Font.new()
+          my_font.set_point_size(10)
+          label.set_font(my_font)     
+    end
+  end
