@@ -1,0 +1,77 @@
+class DisplayFrame <Wx::Frame
+  def initialize(parent)       
+    #creates a new window o=for the main menu
+    super(nil, -1, "Pong Main Menu", Wx::DEFAULT_POSITION, :size=>[500,500])
+    panel = Panel.new(self, -1)
+        
+    #sets the color of the main menu to black
+    set_background_colour(WHITE)
+    
+    #creates a button and labels it Exit, if clicked closes the window
+    exit = Button.new(panel, -1, "Exit", Point.new(200,305))
+    evt_button( exit.get_id ) { on_close_me }
+      
+    #writes text on the window and creates a button labeled P1 vs CPU, 
+    #if clicked starts a game against a computer player  
+    label3 = StaticText.new(panel, -1, "Select a game mode:", Point.new(180,180))
+    button1 = Button.new(panel, -1, "P1 vs CPU", Point.new(200,200))
+      
+    evt_button( button1.get_id ){ 
+      parent.newGame(1)
+      on_close_me
+    }
+    
+    #creates a button labeled Time Trail, 
+    #if clicked opens a new window and starts a time trail game
+    button2 = Button.new(panel, -1, "Time Trial", Point.new(200,235))
+      
+    evt_button( button2.get_id ){ 
+      parent.newGame(2)
+      on_close_me
+    }
+              
+    #creates a button help button that when clicked
+    #brings up a window telling the user about the game
+    button3 = Button.new(panel, -1, "Help", Point.new(200,270))
+    evt_button( button3.get_id ) { helpWindow = Help.new.show}
+    
+    #writes the main text for the main menu and sets its various font sizes and syles
+    label = StaticText.new(panel, -1, "EXTREME PONG", Point.new(50,25))
+    label2 = StaticText.new(panel, -1, "Extended Edition", Point.new(140,85))
+    label.set_foreground_colour(Wx::BLUE)
+    my_font = Wx::Font.new()
+    my_font.set_family(Wx::FONTFAMILY_MODERN)
+    my_font.set_style(Wx::FONTSTYLE_ITALIC)
+    my_font.set_weight(Wx::FONTWEIGHT_BOLD)
+    my_font.set_point_size(40)
+    label.set_font(my_font)
+    
+    label2.set_foreground_colour(Wx::BLUE)
+    my_font = Wx::Font.new()
+    my_font.set_point_size(20)
+    label2.set_font(my_font)
+    
+    label3.set_foreground_colour(Wx::BLUE)
+    my_font = Wx::Font.new()
+    my_font.set_point_size(10)
+    label3.set_font(my_font)
+    
+    #closes window
+    evt_close { | e | 
+      on_close_window(e) }
+    
+      #sets button text colors to red
+    button1.set_foreground_colour(Wx::RED)
+    button2.set_foreground_colour(Wx::RED)
+    button3.set_foreground_colour(Wx::RED)
+    exit.set_foreground_colour(Wx::RED)
+      
+  end
+  
+  def on_close_me
+      close(true)
+  end
+
+  def on_close_window(event)
+    event.skip
+  end
