@@ -75,3 +75,4 @@ class DisplayFrame <Wx::Frame
   def on_close_window(event)
     event.skip
   end
+end
